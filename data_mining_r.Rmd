@@ -1,0 +1,86 @@
+---
+title: "Data Mining - Association"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Data Loading and Preprocessing
+
+First,we import in our Housing dataset and have a preliminary look at it.
+
+```{r}
+df = read.csv('austinHousingData.csv', header = TRUE)
+head(df)
+```
+
+We need to get rid of the columns that we have not used in our database, followed by having a look at the datatype of the remaining columns
+
+```{r}
+df = subset(df, select = -c(description, numOfPhotos, latest_salemonth, latest_saleyear, homeImage))
+colnames(df)
+```
+
+There are a few other variables that we do not require when performing data mining exercises. These includ, zpid, streetAddress, latitude, longitude, latestPriceSource.
+
+```{r}
+df = subset(df, select = -c(zpid, streetAddress, latitude, longitude, latestPriceSource))
+sapply(df, typeof)
+```
+
+Firstly, all the columns with type 'character', except *homeType* and *latest_saledate*, are actually boolean values. So, we convert them into 0 & 1.
+Also, we need to convert *latest_saledate* and *yearBuilt* columns to UNIX seconds so that they are better recognised by our model.
+
+```{r}
+df[,5:10][df[,5:10] == 'True'] = 1
+df[,5:10][df[,5:10] == 'False'] = 0
+
+df[,5:10] = sapply(df[,5:10], as.numeric)
+
+df$latest_saledate = as.numeric ( as.POSIXct( 
+  as.Date(df$latest_saledate, format = "%Y-%m-%d", origin = '1970-01-01') ) )
+  
+df$yearBuilt = as.numeric ( as.POSIXct(
+  as.Date(df$yearBuilt, format = "%Y", origin = '1970-01-01') ) )
+  
+sapply(df, typeof)
+```
+
+Since all the column domains have such a difference in scale, we will normalize our data using `scale()` function.
+
+```{r}
+normdf = scale(subset(df, select = -c(city, homeType)))
+
+normdf = data.frame(normdf)
+head(normdf)
+```
+
+Now, for our last preprocessing step, we add the non-numeric columns to the normalized dataframe
+
+```{r}
+normdf$city = df$city
+normdf$homeType = df$homeType
+
+colnames(normdf)
+```
+
+Verifying once,
+```{r}
+setequal(colnames(df), colnames(normdf))
+```
+## Correlation
+
+Let us have a look at Pearson's correlation coefficient matrix for our data. The funtion for it only accepts numeric data. We only print the coefficients for *latestPrice* column.
+```{r}
+corrmat <- cor( normdf[,-c(36,37)] )
+round(corrmat[,'latestPrice'], 2)
+```
+
+## Model Building
+
+```{r}
+lrmodel = lm(latestPrice ~ ., data = normdf)
+summary( lrmodel )
+```
+
+
